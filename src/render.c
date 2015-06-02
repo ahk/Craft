@@ -9,6 +9,7 @@
 #include "util.h"
 #include "chunk.h"
 #include "physics.h"
+#include "game.h"
 
 int render_chunks(Attrib *attrib, Player *player) {
     int result = 0;

@@ -2,6 +2,8 @@
 #include "physics.h"
 #include "util.h"
 #include "item.h"
+#include "chunk.h"
+#include "game.h"
 
 int _hit_test(
     Map *map, float max_distance, int previous,

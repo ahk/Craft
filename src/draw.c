@@ -1,4 +1,7 @@
+#include <string.h>
 #include "draw.h"
+#include "cube.h"
+#include "util.h"
 
 GLuint gen_crosshair_buffer() {
     int x = g->width / 2;

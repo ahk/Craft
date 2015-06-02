@@ -1,6 +1,8 @@
 #include <string.h>
 #include <math.h>
 #include "player.h"
+#include "draw.h"
+#include "game.h"
 #include "util.h"
 
 Player *find_player(int id) {

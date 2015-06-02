@@ -1,17 +1,18 @@
 #include "config.h"
+#include "cvars.h"
 #include "noise.h"
 #include "world.h"
 
 void create_world(int p, int q, world_func func, void *arg) {
     int pad = 1;
-    for (int dx = -pad; dx < CHUNK_SIZE + pad; dx++) {
-        for (int dz = -pad; dz < CHUNK_SIZE + pad; dz++) {
+    for (int dx = -pad; dx < CVAR_WORLD_CHUNK_SIZE + pad; dx++) {
+        for (int dz = -pad; dz < CVAR_WORLD_CHUNK_SIZE + pad; dz++) {
             int flag = 1;
-            if (dx < 0 || dz < 0 || dx >= CHUNK_SIZE || dz >= CHUNK_SIZE) {
+            if (dx < 0 || dz < 0 || dx >= CVAR_WORLD_CHUNK_SIZE || dz >= CVAR_WORLD_CHUNK_SIZE) {
                 flag = -1;
             }
-            int x = p * CHUNK_SIZE + dx;
-            int z = q * CHUNK_SIZE + dz;
+            int x = p * CVAR_WORLD_CHUNK_SIZE + dx;
+            int z = q * CVAR_WORLD_CHUNK_SIZE + dz;
             float f = simplex2(x * 0.01, z * 0.01, 4, 0.5, 2);
             float g = simplex2(-x * 0.01, -z * 0.01, 2, 0.9, 2);
             int mh = g * 32 + 16;
@@ -27,7 +28,7 @@ void create_world(int p, int q, world_func func, void *arg) {
                 func(x, y, z, w * flag, arg);
             }
             if (w == 1) {
-                if (SHOW_PLANTS) {
+                if (CVAR_RENDER_SHOW_PLANTS) {
                     // grass
                     if (simplex2(-x * 0.1, z * 0.1, 4, 0.8, 2) > 0.6) {
                         func(x, h, z, 17 * flag, arg);
@@ -39,9 +40,9 @@ void create_world(int p, int q, world_func func, void *arg) {
                     }
                 }
                 // trees
-                int ok = SHOW_TREES;
+                int ok = CVAR_RENDER_SHOW_TREES;
                 if (dx - 4 < 0 || dz - 4 < 0 ||
-                    dx + 4 >= CHUNK_SIZE || dz + 4 >= CHUNK_SIZE)
+                    dx + 4 >= CVAR_WORLD_CHUNK_SIZE || dz + 4 >= CVAR_WORLD_CHUNK_SIZE)
                 {
                     ok = 0;
                 }
@@ -63,7 +64,7 @@ void create_world(int p, int q, world_func func, void *arg) {
                 }
             }
             // clouds
-            if (SHOW_CLOUDS) {
+            if (CVAR_RENDER_SHOW_CLOUDS) {
                 for (int y = 64; y < 72; y++) {
                     if (simplex3(
                         x * 0.01, y * 0.1, z * 0.01, 8, 0.5, 2) > 0.75)

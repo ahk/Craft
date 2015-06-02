@@ -1,4 +1,3 @@
-#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <curl/curl.h>
 #include <math.h>
@@ -6,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "cvars.h"
 #include "auth.h"
 #include "client.h"
 #include "config.h"
@@ -156,8 +156,9 @@ typedef struct {
 static Model model;
 static Model *g = &model;
 
+
 int chunked(float x) {
-    return floorf(roundf(x) / CHUNK_SIZE);
+    return floorf(roundf(x) / CVAR_WORLD_CHUNK_SIZE);
 }
 
 float time_of_day() {
@@ -542,9 +543,9 @@ int chunk_distance(Chunk *chunk, int p, int q) {
 }
 
 int chunk_visible(float planes[6][4], int p, int q, int miny, int maxy) {
-    int x = p * CHUNK_SIZE - 1;
-    int z = q * CHUNK_SIZE - 1;
-    int d = CHUNK_SIZE + 1;
+    int x = p * CVAR_WORLD_CHUNK_SIZE - 1;
+    int z = q * CVAR_WORLD_CHUNK_SIZE - 1;
+    int d = CVAR_WORLD_CHUNK_SIZE + 1;
     float points[8][3] = {
         {x + 0, miny, z + 0},
         {x + d, miny, z + 0},
@@ -841,7 +842,7 @@ void gen_sign_buffer(Chunk *chunk) {
 }
 
 int has_lights(Chunk *chunk) {
-    if (!SHOW_LIGHTS) {
+    if ( !CVAR_RENDER_SHOW_LIGHTS ){
         return 0;
     }
     for (int dp = -1; dp <= 1; dp++) {
@@ -920,9 +921,9 @@ void occlusion(
     }
 }
 
-#define XZ_SIZE (CHUNK_SIZE * 3 + 2)
-#define XZ_LO (CHUNK_SIZE)
-#define XZ_HI (CHUNK_SIZE * 2 + 1)
+#define XZ_SIZE (CVAR_WORLD_CHUNK_SIZE * 3 + 2)
+#define XZ_LO (CVAR_WORLD_CHUNK_SIZE)
+#define XZ_HI (CVAR_WORLD_CHUNK_SIZE * 2 + 1)
 #define Y_SIZE 258
 #define XYZ(x, y, z) ((y) * XZ_SIZE * XZ_SIZE + (x) * XZ_SIZE + (z))
 #define XZ(x, z) ((x) * XZ_SIZE + (z))
@@ -960,13 +961,13 @@ void compute_chunk(WorkerItem *item) {
     char *light = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
     char *highest = (char *)calloc(XZ_SIZE * XZ_SIZE, sizeof(char));
 
-    int ox = item->p * CHUNK_SIZE - CHUNK_SIZE - 1;
+    int ox = item->p * CVAR_WORLD_CHUNK_SIZE - CVAR_WORLD_CHUNK_SIZE - 1;
     int oy = -1;
-    int oz = item->q * CHUNK_SIZE - CHUNK_SIZE - 1;
+    int oz = item->q * CVAR_WORLD_CHUNK_SIZE - CVAR_WORLD_CHUNK_SIZE - 1;
 
     // check for lights
     int has_light = 0;
-    if (SHOW_LIGHTS) {
+    if ( CVAR_RENDER_SHOW_LIGHTS ) {
         for (int a = 0; a < 3; a++) {
             for (int b = 0; b < 3; b++) {
                 Map *map = item->light_maps[a][b];
@@ -1201,9 +1202,9 @@ void init_chunk(Chunk *chunk, int p, int q) {
     db_load_signs(signs, p, q);
     Map *block_map = &chunk->map;
     Map *light_map = &chunk->lights;
-    int dx = p * CHUNK_SIZE - 1;
+    int dx = p * CVAR_WORLD_CHUNK_SIZE - 1;
     int dy = 0;
-    int dz = q * CHUNK_SIZE - 1;
+    int dz = q * CVAR_WORLD_CHUNK_SIZE - 1;
     map_alloc(block_map, dx, dy, dz, 0x7fff);
     map_alloc(light_map, dx, dy, dz, 0xf);
 }
@@ -1625,7 +1626,7 @@ int render_chunks(Attrib *attrib, Player *player) {
     glUniform1i(attrib->sampler, 0);
     glUniform1i(attrib->extra1, 2);
     glUniform1f(attrib->extra2, light);
-    glUniform1f(attrib->extra3, g->render_radius * CHUNK_SIZE);
+    glUniform1f(attrib->extra3, g->render_radius * CVAR_WORLD_CHUNK_SIZE);
     glUniform1i(attrib->extra4, g->ortho);
     glUniform1f(attrib->timer, time_of_day());
     for (int i = 0; i < g->chunk_count; i++) {
@@ -1742,12 +1743,12 @@ void render_wireframe(Attrib *attrib, Player *player) {
     if (is_obstacle(hw)) {
         glUseProgram(attrib->program);
         glLineWidth(1);
-        glEnable(GL_COLOR_LOGIC_OP);
+        //glEnable(GL_COLOR_LOGIC_OP);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         GLuint wireframe_buffer = gen_wireframe_buffer(hx, hy, hz, 0.53);
         draw_lines(attrib, wireframe_buffer, 3, 24);
         del_buffer(wireframe_buffer);
-        glDisable(GL_COLOR_LOGIC_OP);
+        //glDisable(GL_COLOR_LOGIC_OP);
     }
 }
 
@@ -1756,12 +1757,12 @@ void render_crosshairs(Attrib *attrib) {
     set_matrix_2d(matrix, g->width, g->height);
     glUseProgram(attrib->program);
     glLineWidth(4 * g->scale);
-    glEnable(GL_COLOR_LOGIC_OP);
+    //glEnable(GL_COLOR_LOGIC_OP);
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
     GLuint crosshair_buffer = gen_crosshair_buffer();
     draw_lines(attrib, crosshair_buffer, 2, 4);
     del_buffer(crosshair_buffer);
-    glDisable(GL_COLOR_LOGIC_OP);
+    //glDisable(GL_COLOR_LOGIC_OP);
 }
 
 void render_item(Attrib *attrib) {
@@ -2024,11 +2025,19 @@ void parse_command(const char *buffer, int forward) {
     char server_addr[MAX_ADDR_LENGTH];
     int server_port = DEFAULT_PORT;
     char filename[MAX_PATH_LENGTH];
+    char varname[128] = {0};
+    char varvalue[128] = {0};
     int radius, count, xc, yc, zc;
     if (sscanf(buffer, "/identity %128s %128s", username, token) == 2) {
         db_auth_set(username, token);
         add_message("Successfully imported identity token!");
         login();
+    }
+    else if (sscanf(buffer, "/set %128s %128s", varname, varvalue) == 2) {
+        if (cvar_set_value_from_string(varname, varvalue) )
+            add_message("Variable successfully set!");
+        else
+            add_message("Failed to set variable!");
     }
     else if (strcmp(buffer, "/logout") == 0) {
         db_auth_select_none();
@@ -2125,6 +2134,9 @@ void parse_command(const char *buffer, int forward) {
     }
     else if (forward) {
         client_talk(buffer);
+    }
+    else {
+        add_message("Unknown command");
     }
 }
 
@@ -2607,13 +2619,9 @@ int main(int argc, char **argv) {
     glfwSetMouseButtonCallback(g->window, on_mouse_button);
     glfwSetScrollCallback(g->window, on_scroll);
 
-    if (glewInit() != GLEW_OK) {
-        return -1;
-    }
-
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
-    glLogicOp(GL_INVERT);
+    //glLogicOp(GL_INVERT);
     glClearColor(0, 0, 0, 1);
 
     // LOAD TEXTURES //
@@ -2711,10 +2719,10 @@ int main(int argc, char **argv) {
         snprintf(g->db_path, MAX_PATH_LENGTH, "%s", DB_PATH);
     }
 
-    g->create_radius = CREATE_CHUNK_RADIUS;
-    g->render_radius = RENDER_CHUNK_RADIUS;
-    g->delete_radius = DELETE_CHUNK_RADIUS;
-    g->sign_radius = RENDER_SIGN_RADIUS;
+    g->create_radius = CVAR_WORLD_CREATE_CHUNK_RADIUS;
+    g->render_radius = CVAR_WORLD_RENDER_CHUNK_RADIUS;
+    g->delete_radius = CVAR_WORLD_DELETE_CHUNK_RADIUS;
+    g->sign_radius = CVAR_WORLD_RENDER_SIGN_RADIUS;
 
     // INITIALIZE WORKER THREADS
     for (int i = 0; i < WORKERS; i++) {
@@ -2807,7 +2815,7 @@ int main(int argc, char **argv) {
             }
 
             // FLUSH DATABASE //
-            if (now - last_commit > COMMIT_INTERVAL) {
+            if (now - last_commit > CVAR_WORLD_COMMIT_INTERVAL) {
                 last_commit = now;
                 db_commit();
             }
@@ -2838,39 +2846,45 @@ int main(int argc, char **argv) {
             render_signs(&text_attrib, player);
             render_sign(&text_attrib, player);
             render_players(&block_attrib, player);
-            if (SHOW_WIREFRAME) {
+            if (CVAR_RENDER_SHOW_WIREFRAME) {
                 render_wireframe(&line_attrib, player);
             }
 
             // RENDER HUD //
             glClear(GL_DEPTH_BUFFER_BIT);
-            if (SHOW_CROSSHAIRS) {
+            if (CVAR_RENDER_SHOW_CROSSHAIRS) {
                 render_crosshairs(&line_attrib);
             }
-            if (SHOW_ITEM) {
+            if (CVAR_RENDER_SHOW_ITEM) {
                 render_item(&block_attrib);
             }
 
             // RENDER TEXT //
             char text_buffer[1024];
-            float ts = 12 * g->scale;
+            float ts = CVAR_RENDER_TEXT_SIZE * g->scale;
             float tx = ts / 2;
             float ty = g->height - ts;
-            if (SHOW_INFO_TEXT) {
+            if (CVAR_RENDER_SHOW_INFO_TEXT) {
                 int hour = time_of_day() * 24;
                 char am_pm = hour < 12 ? 'a' : 'p';
                 hour = hour % 12;
                 hour = hour ? hour : 12;
                 snprintf(
                     text_buffer, 1024,
-                    "(%d, %d) (%.2f, %.2f, %.2f) [%d, %d, %d] %d%cm %dfps",
-                    chunked(s->x), chunked(s->z), s->x, s->y, s->z,
+                    "(%d, %d) (%.2f, %.2f, %.2f)",
+                    chunked(s->x), chunked(s->z), s->x, s->y, s->z);
+                render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts, text_buffer);
+                ty -= ts * 2;
+
+                snprintf(
+                    text_buffer, 1024,
+                    "[%d, %d, %d] %d%cm %dfps",
                     g->player_count, g->chunk_count,
                     face_count * 2, hour, am_pm, fps.fps);
                 render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts, text_buffer);
                 ty -= ts * 2;
             }
-            if (SHOW_CHAT_TEXT) {
+            if (CVAR_RENDER_SHOW_CHAT_TEXT) {
                 for (int i = 0; i < MAX_MESSAGES; i++) {
                     int index = (g->message_index + i) % MAX_MESSAGES;
                     if (strlen(g->messages[index])) {
@@ -2885,7 +2899,7 @@ int main(int argc, char **argv) {
                 render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts, text_buffer);
                 ty -= ts * 2;
             }
-            if (SHOW_PLAYER_NAMES) {
+            if (CVAR_RENDER_SHOW_PLAYER_NAMES) {
                 if (player != me) {
                     render_text(&text_attrib, ALIGN_CENTER,
                         g->width / 2, ts, ts, player->name);
@@ -2927,7 +2941,7 @@ int main(int argc, char **argv) {
                 render_signs(&text_attrib, player);
                 render_players(&block_attrib, player);
                 glClear(GL_DEPTH_BUFFER_BIT);
-                if (SHOW_PLAYER_NAMES) {
+                if (CVAR_RENDER_SHOW_PLAYER_NAMES) {
                     render_text(&text_attrib, ALIGN_CENTER,
                         pw / 2, ts, ts, player->name);
                 }
